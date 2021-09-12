@@ -7,7 +7,7 @@ const PORT = 4000
 
 const driver = neo4j.driver(
     "bolt://neo4j:7687",
-    neo4j.auth.basic("neo4j", "letmein")
+    neo4j.auth.basic("neo4j", process.env.NEO4J_PASS)
 );
 
 const neoSchema = new Neo4jGraphQL({ typeDefs, driver });

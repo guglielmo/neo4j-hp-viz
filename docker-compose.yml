@@ -1,39 +1,90 @@
 version: "3.7"
 services:
+  
   neo4j:
+    container_name: grandstack_neo4j
     image: neo4j:4.3.2
     restart: always
     hostname: neo4j
-    container_name: neo4j
     ports:
-      - 7474:7474
-      - 7687:7687
+      - 7475:7474
+      - 7688:7687
     volumes:
-      - ./neo4j/data:/data
-      - ./neo4j/import:/import
+      - neo4j_data:/data
+      - neo4j_import:/import
     environment:
-      - NEO4J_AUTH=neo4j/letmein
+      - NEO4J_AUTH=neo4j/${NEO4J_PASS}
       - NEO4JLABS_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,algo.*,gds.*
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_export_file_enabled=true
+      - SECURE_FILE_PERMISSIONS=yes
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=gw"
+      - "traefik.http.routers.grandstack_neo4j.rule=Host(`neo4j.${DOMAIN}`)"
+      - "traefic.http.routers.grandstack_neo4j.entrypoint=websecure"
+      - "traefik.http.routers.grandstack_neo4j.tls.certresolver=${CERT_RESOLVER}"
+    networks:
+      - default
+      - gw
+  
   graphql:
+    container_name: grandstack_graphql
     build:
       context: ./graphql
     hostname: graphql
     restart: always
-    container_name: graphql
     ports:
       - 4000:4000
+    environment:
+      - NEO4J_USER=neo4j
+      - NEO4J_PASS=${NEO4J_PASS}
     links:
       - neo4j
     depends_on:
       - neo4j
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=gw"
+      - "traefik.http.routers.grandstack_graphql.rule=Host(`graphql.${DOMAIN}`)"
+      - "traefic.http.routers.grandstack_graphql.entrypoint=websecure"
+      - "traefik.http.routers.grandstack_graphql.tls.certresolver=${CERT_RESOLVER}"
+    networks:
+      - default
+      - gw
+      
   ui:
     build: ./ui
-    container_name: ui
+    container_name: grandstack_ui
     ports:
       - 3000:3000
     environment:
-      - REACT_APP_GRAPHQL_URI=http://localhost:4000/graphql
+      - REACT_APP_GRAPHQL_URI=https://graphql.${DOMAIN}/graphql
     links:
         - graphql
     depends_on:
       - graphql
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=gw"
+      - "traefik.http.routers.grandstack.rule=Host(`${DOMAIN}`)"
+      - "traefic.http.routers.grandstack.entrypoint=websecure"
+      - "traefik.http.routers.grandstack.tls.certresolver=${CERT_RESOLVER}"
+    networks:
+      - default
+      - gw
+
+
+volumes:
+  neo4j_data:
+    name: grandstack_neo4j_data
+  neo4j_import:
+    name: grandstack_neo4j_import
+
+networks:
+  default:
+    external: false
+    name: grandstack
+  gw:
+    external: true
